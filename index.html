@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Inventory — Single Page App (Final)</title>
+<style>
+  :root{--accent:#2563eb;--danger:#dc2626;--muted:#6b7280;--card:#fff;--bg:#f4f6fb}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:#0f172a}
+  header{background:var(--accent);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between}
+  header h1{margin:0;font-size:18px}
+  nav{display:flex;gap:6px;padding:8px;background:#0b1220}
+  nav button{background:transparent;border:0;color:#fff;padding:10px 12px;border-radius:8px;cursor:pointer}
+  nav button.active{background:rgba(255,255,255,0.06)}
+  main{max-width:1100px;margin:18px auto;padding:12px}
+  .section{display:none}
+  .section.active{display:block}
+  .card{background:var(--card);padding:16px;border-radius:10px;box-shadow:0 6px 20px rgba(8,15,30,0.06);margin-bottom:14px}
+  .row{display:flex;gap:12px}
+  .row .col{flex:1}
+  input,select,textarea,button{font:inherit}
+  input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef8;margin-top:6px}
+  button.btn{background:var(--accent);color:white;padding:9px 12px;border-radius:8px;border:0;cursor:pointer}
+  button.secondary{background:#64748b}
+  button.danger{background:var(--danger)}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:left;font-size:14px}
+  th{background:#fbfdff;font-weight:600}
+  .muted{color:var(--muted);font-size:13px}
+  .small{max-width:260px}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.5);display:none;align-items:center;justify-content:center;z-index:80}
+  .modal{background:#fff;padding:16px;border-radius:10px;min-width:320px;max-width:520px}
+  .modal .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+  @media(max-width:820px){.row{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1><b>📦 U Systems Inventory System</b></h1>
+  <div class="muted">Local-only • Saved to browser</div>
+</header>
+
+<nav id="mainNav">
+  <button data-view="dashboard" class="active"><b>Dashboard</b></button>
+  <button data-view="stockin"><b>Stock In</b></button>
+  <button data-view="stockout"><b>Stock Out</b></button>
+  <button data-view="inventory"><b>Inventory</b></button>
+  <button data-view="records"><b>Records</b></button>
+  <button data-view="planning"><b>Planning</b></button>
+</nav>
+
+<main>
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="section active">
+    <div class="card">
+      <h2>Overview</h2>
+      <div class="row">
+        <div class="col">
+          <div class="muted">Stock Recieved</div>
+          <div id="statIn" style="font-weight:700;font-size:20px">0</div>
+        </div>
+        <div class="col">
+          <div class="muted">Stock Issued</div>
+          <div id="statOut" style="font-weight:700;font-size:20px">0</div>
+        </div>
+        <div class="col">
+          <div class="muted">Inventory qty (store room)</div>
+          <div id="statInventory" style="font-weight:700;font-size:20px">0</div>
+        </div>
+        <div class="small col">
+          <div class="muted">Planned installs</div>
+          <div id="statPlanned" style="font-weight:700;font-size:20px">0</div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px" class="row">
+        <div class="col">
+          <input id="globalSearch" placeholder="Search records (device, serial, site, issued to)"/>
+        </div>
+        <div class="small">
+          <select id="globalSiteFilter"><option value="">All Sites</option></select>
+        </div>
+        <div class="small">
+          <button class="btn" id="exportRecordsBtn">Export Records (CSV)</button>
+        </div>
+      </div>
+
+      <div style="margin-top:14px" class="card">
+        <h3 style="margin:0 0 8px 0">Top stats</h3>
+        <div class="muted">Most issued device</div>
+        <div id="mostIssued">—</div>
+        <div class="muted" style="margin-top:8px">Top site</div>
+        <div id="topSite">—</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STOCK IN -->
+  <section id="stockin" class="section">
+    <div class="card">
+      <h2>Add / Edit Stock In</h2>
+      <div class="row">
+        <div class="col">
+          <label class="muted">Device</label>
+          <input id="inDevice" placeholder="Device name" />
+        </div>
+        <div class="col">
+          <label class="muted">Serial</label>
+          <input id="inSerial" placeholder="Serial number" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <label class="muted">Quantity</label>
+          <input id="inQty" type="number" placeholder="Quantity" />
+        </div>
+        <div class="col">
+          <label class="muted">Date</label>
+          <input id="inDate" type="date" />
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <button class="btn" id="saveInBtn">Save</button>
+        <button class="btn secondary" id="clearInBtn">Clear</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Current Stock (Not Issued)</h3>
+      <table>
+        <thead><tr><th>Device</th><th>Serial</th><th>Qty</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="stockInTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- STOCK OUT -->
+  <section id="stockout" class="section">
+    <div class="card">
+      <h2>Issued (Pending)</h2>
+      <table>
+        <thead><tr><th>Device</th><th>Serial</th><th>Qty</th><th>Date Issued</th><th>Issued To</th><th>Site</th><th>Actions</th></tr></thead>
+        <tbody id="stockOutTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- INVENTORY (manual quantities) -->
+  <section id="inventory" class="section">
+    <div class="card">
+      <h2>Inventory (Store Room) — Manual</h2>
+      <div class="row">
+        <div class="col"><input id="invDevice" placeholder="Device name"></div>
+        <div class="col"><input id="invSerial" placeholder="Serial number (optional)"></div>
+      </div>
+      <div class="row">
+        <div class="col"><input id="invQty" type="number" placeholder="Quantity"></div>
+        <div class="col"><input id="invDate" type="date"></div>
+      </div>
+      <div style="margin-top:8px">
+        <button class="btn" id="saveInvBtn">Save Inventory</button>
+        <button class="btn secondary" id="clearInvBtn">Clear</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Inventory Items</h3>
+      <table>
+        <thead><tr><th>Device</th><th>Serial</th><th>Qty</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="inventoryTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- RECORDS -->
+  <section id="records" class="section">
+    <div class="card">
+      <h2>Records (History)</h2>
+      <div class="row" style="align-items:center;margin-bottom:8px">
+        <div class="col"><input id="recordsSearch" placeholder="Search records..." /></div>
+        <div class="small">
+          <select id="recordsSiteFilter"><option value="">All Sites</option></select>
+        </div>
+        <div class="small">
+          <button class="btn" id="exportBtn">Export Records (CSV)</button>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Type</th><th>Device</th><th>Serial</th><th>Qty</th><th>Site</th><th>Issued To</th><th>Date</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="recordsTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- PLANNING -->
+  <section id="planning" class="section">
+    <div class="card">
+      <h2>Planned Installations</h2>
+      <div class="row">
+        <div class="col"><input id="planDate" type="date"></div>
+        <div class="col">
+          <select id="planSite"><option value="">Select site</option></select>
+        </div>
+      </div>
+      <input id="planDevices" placeholder="Devices required (comma separated)">
+      <textarea id="planNotes" placeholder="Notes" rows="2" style="width:100%;margin-top:8px;border-radius:8px;padding:8px"></textarea>
+      <div style="margin-top:8px">
+        <button class="btn" id="addPlanBtn">Add Planning</button>
+        <button class="btn secondary" id="exportPlanBtn">Export Planning (CSV)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Planning Table</h3>
+      <table>
+        <thead><tr><th>Date</th><th>Site</th><th>Devices</th><th>Notes</th><th>Actions</th></tr></thead>
+        <tbody id="planningTable"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<!-- Issue Modal -->
+<div id="issueModal" class="modal-backdrop" style="display:none;align-items:center;justify-content:center">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>Issue Item</h3>
+    <div style="margin-top:8px">
+      <div class="muted">Device</div><div id="modalDevice" style="font-weight:700"></div>
+      <div class="muted" style="margin-top:8px">Serial</div><div id="modalSerial"></div>
+      <label class="muted" style="margin-top:8px">Issued To</label><input id="modalIssuedTo" placeholder="Person / Company">
+      <label class="muted" style="margin-top:8px">Site</label><select id="modalSite"><option value="">Select site</option></select>
+      <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+        <button class="btn secondary" id="modalCancel">Cancel</button>
+        <button class="btn" id="modalIssueSave">Issue (Move to Stock Out)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========= Data arrays (localStorage) ========= */
+const SITES = ['PNP Sunninghill','PNP Fourways','Spur SunTime Square','Spar Randburg','Makro Silver Lakes'];
+let stockIn = JSON.parse(localStorage.getItem('stockIn') || '[]');    // IN items
+let stockOut = JSON.parse(localStorage.getItem('stockOut') || '[]');  // issued, pending DONE
+let records = JSON.parse(localStorage.getItem('records') || '[]');    // history of IN/OUT completed
+let inventory = JSON.parse(localStorage.getItem('inventory') || '[]'); // manual store room
+let planning = JSON.parse(localStorage.getItem('planning') || '[]');
+
+const uid = ()=> Date.now() + Math.floor(Math.random()*1000);
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function saveAll(){
+  localStorage.setItem('stockIn', JSON.stringify(stockIn));
+  localStorage.setItem('stockOut', JSON.stringify(stockOut));
+  localStorage.setItem('records', JSON.stringify(records));
+  localStorage.setItem('inventory', JSON.stringify(inventory));
+  localStorage.setItem('planning', JSON.stringify(planning));
+  renderAll();
+}
+
+/* ========= DOM refs ========= */
+const navButtons = document.querySelectorAll('#mainNav button');
+const sections = {
+  dashboard: document.getElementById('dashboard'),
+  stockin: document.getElementById('stockin'),
+  stockout: document.getElementById('stockout'),
+  inventory: document.getElementById('inventory'),
+  records: document.getElementById('records'),
+  planning: document.getElementById('planning')
+};
+
+const statIn = document.getElementById('statIn');
+const statOut = document.getElementById('statOut');
+const statInventory = document.getElementById('statInventory');
+const statPlanned = document.getElementById('statPlanned');
+const mostIssuedEl = document.getElementById('mostIssued');
+const topSiteEl = document.getElementById('topSite');
+
+const dashSearch = document.getElementById('globalSearch');
+const dashSiteFilter = document.getElementById('globalSiteFilter');
+
+const stockInTable = document.getElementById('stockInTable');
+const stockOutTable = document.getElementById('stockOutTable');
+const inventoryTable = document.getElementById('inventoryTable');
+const recordsTable = document.getElementById('recordsTable');
+const planningTable = document.getElementById('planningTable');
+
+const planSiteSelect = document.getElementById('planSite');
+
+const issueModal = document.getElementById('issueModal');
+const modalDevice = document.getElementById('modalDevice');
+const modalSerial = document.getElementById('modalSerial');
+const modalIssuedTo = document.getElementById('modalIssuedTo');
+const modalSite = document.getElementById('modalSite');
+const modalCancel = document.getElementById('modalCancel');
+const modalIssueSave = document.getElementById('modalIssueSave');
+
+let issueTargetId = null;
+let editingStockInId = null;
+let editingInventoryId = null;
+
+/* ========= Initialization ========= */
+function populateSiteSelects(){
+  [dashSiteFilter, document.getElementById('recordsSiteFilter'), planSiteSelect, modalSite].forEach(sel=>{
+    sel.innerHTML = '<option value="">All Sites</option>';
+    SITES.forEach(s => sel.insertAdjacentHTML('beforeend', `<option value="${esc(s)}">${esc(s)}</option>`));
+  });
+}
+populateSiteSelects();
+
+navButtons.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    navButtons.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const view = btn.dataset.view;
+    Object.values(sections).forEach(s=>s.classList.remove('active'));
+    if(sections[view]) sections[view].classList.add('active');
+    renderAll();
+  });
+});
+
+/* ========= Stock In flows ========= */
+document.getElementById('saveInBtn').addEventListener('click', ()=>{
+  const device = document.getElementById('inDevice').value.trim();
+  const serial = document.getElementById('inSerial').value.trim();
+  const qty = Number(document.getElementById('inQty').value) || 0;
+  const date = document.getElementById('inDate').value || new Date().toISOString().slice(0,10);
+  if(!device || !serial || qty <= 0) return alert('Provide device, serial and positive quantity');
+
+  if(editingStockInId){
+    // update existing
+    let idx = stockIn.findIndex(x=>x.id===editingStockInId);
+    if(idx !== -1){
+      stockIn[idx].device = device; stockIn[idx].serial = serial; stockIn[idx].qty = qty; stockIn[idx].date = date;
+      // record update also push to history as IN? We will push a new IN record for the edit
+      records.push({ id: uid(), type:'IN', device, serial, qty, date, note:'Edited' });
+    } else {
+      // maybe it was in stockOut; update there
+      idx = stockOut.findIndex(x=>x.id===editingStockInId);
+      if(idx !== -1){
+        stockOut[idx].device = device; stockOut[idx].serial = serial; stockOut[idx].qty = qty; stockOut[idx].dateIssued = date;
+      } else {
+        stockIn.push({ id: editingStockInId, device, serial, qty, date });
+      }
+    }
+    editingStockInId = null;
+    document.getElementById('saveInBtn').textContent = 'Save';
+  } else {
+    const item = { id: uid(), device, serial, qty, date };
+    stockIn.push(item);
+    // record history of IN
+    records.push({ id: uid(), type:'IN', device, serial, qty, date });
+  }
+  document.getElementById('inDevice').value=''; document.getElementById('inSerial').value=''; document.getElementById('inQty').value=''; document.getElementById('inDate').value='';
+  saveAll();
+});
+document.getElementById('clearInBtn').addEventListener('click', ()=>{ editingStockInId = null; document.getElementById('saveInBtn').textContent='Save'; document.getElementById('inDevice').value=''; document.getElementById('inSerial').value=''; document.getElementById('inQty').value=''; document.getElementById('inDate').value=''; });
+
+/* ========= Issue flow (modal) ========= */
+function openIssueModal(id){
+  const item = stockIn.find(x=>x.id===id);
+  if(!item) return alert('Item not found or already issued');
+  issueTargetId = id;
+  modalDevice.textContent = item.device;
+  modalSerial.textContent = item.serial;
+  modalIssuedTo.value = '';
+  modalSite.value = '';
+  issueModal.style.display = 'flex';
+  modalIssuedTo.focus();
+}
+modalCancel.addEventListener('click', ()=>{ issueModal.style.display='none'; issueTargetId=null; });
+modalIssueSave.addEventListener('click', ()=>{
+  const issuedTo = modalIssuedTo.value.trim();
+  const site = modalSite.value;
+  if(!issuedTo || !site) return alert('Fill Issued To and choose Site');
+  const idx = stockIn.findIndex(x=>x.id===issueTargetId);
+  if(idx === -1) return alert('Item not found');
+  const item = stockIn.splice(idx,1)[0];
+  item.issuedTo = issuedTo;
+  item.site = site;
+  item.dateIssued = new Date().toISOString().slice(0,10);
+  stockOut.push(item);            // pending
+  // Do NOT auto-decrease inventory because you chose manual inventory mode (B)
+  issueModal.style.display='none';
+  issueTargetId = null;
+  saveAll();
+});
+
+/* ========= Stock Out DONE button (move to records) ========= */
+function doneOut(id){
+  const idx = stockOut.findIndex(x=>x.id===id);
+  if(idx === -1) return alert('Item not found');
+  const item = stockOut.splice(idx,1)[0];
+  // push completed OUT to records history
+  records.push({ id: uid(), type:'OUT', device:item.device, serial:item.serial, qty:item.qty, date:item.dateIssued || new Date().toISOString().slice(0,10), issuedTo:item.issuedTo, site:item.site });
+  saveAll();
+}
+
+/* ========= Inventory (manual) ========= */
+document.getElementById('saveInvBtn').addEventListener('click', ()=>{
+  const device = document.getElementById('invDevice').value.trim();
+  const serial = document.getElementById('invSerial').value.trim();
+  const qty = Number(document.getElementById('invQty').value) || 0;
+  const date = document.getElementById('invDate').value || new Date().toISOString().slice(0,10);
+  if(!device || qty <= 0) return alert('Provide device and positive quantity for inventory');
+  if(editingInventoryId){
+    let idx = inventory.findIndex(x=>x.id===editingInventoryId);
+    if(idx !== -1){
+      inventory[idx].device = device; inventory[idx].serial = serial; inventory[idx].qty = qty; inventory[idx].date = date;
+    }
+    editingInventoryId = null;
+    document.getElementById('saveInvBtn').textContent = 'Save Inventory';
+  } else {
+    inventory.push({ id: uid(), device, serial, qty, date });
+  }
+  document.getElementById('invDevice').value=''; document.getElementById('invSerial').value=''; document.getElementById('invQty').value=''; document.getElementById('invDate').value='';
+  saveAll();
+});
+document.getElementById('clearInvBtn').addEventListener('click', ()=>{
+  editingInventoryId = null;
+  document.getElementById('saveInvBtn').textContent = 'Save Inventory';
+  document.getElementById('invDevice').value=''; document.getElementById('invSerial').value=''; document.getElementById('invQty').value=''; document.getElementById('invDate').value='';
+});
+
+function editInventory(id){
+  const it = inventory.find(x=>x.id===id);
+  if(!it) return;
+  editingInventoryId = id;
+  document.getElementById('invDevice').value = it.device;
+  document.getElementById('invSerial').value = it.serial;
+  document.getElementById('invQty').value = it.qty;
+  document.getElementById('invDate').value = it.date || '';
+  document.getElementById('saveInvBtn').textContent = 'Update Inventory';
+}
+function deleteInventory(id){
+  if(!confirm('Delete inventory item?')) return;
+  inventory = inventory.filter(x=>x.id!==id);
+  saveAll();
+}
+
+/* ========= Records search / delete ========= */
+document.getElementById('exportBtn').addEventListener('click', exportRecordsCSV);
+document.getElementById('exportRecordsBtn').addEventListener('click', exportRecordsCSV);
+document.getElementById('exportPlanBtn').addEventListener('click', exportPlanningCSV);
+
+/* delete record */
+function deleteRecord(id){
+  if(!confirm('Delete this record?')) return;
+  records = records.filter(r=>r.id!==id);
+  saveAll();
+}
+
+/* edit record by moving values back to StockIn (or Inventory) */
+function editRecord(id){
+  const r = records.find(x=>x.id===id);
+  if(!r) return;
+  // open stockin tab and populate fields for easy edit (new entry)
+  navButtons.forEach(b=>b.classList.remove('active'));
+  document.querySelector('#mainNav button[data-view=stockin]').classList.add('active');
+  Object.values(sections).forEach(s=>s.classList.remove('active'));
+  sections.stockin.classList.add('active');
+
+  // populate stockin form for update (creates new IN event when saved)
+  document.getElementById('inDevice').value = r.device || '';
+  document.getElementById('inSerial').value = r.serial || '';
+  document.getElementById('inQty').value = r.qty || '';
+  document.getElementById('inDate').value = r.date || '';
+  editingStockInId = null; // treat as new IN, user can update if wanted
+}
+
+/* ========= Planning flows ========= */
+document.getElementById('addPlanBtn').addEventListener('click', ()=>{
+  const date = document.getElementById('planDate').value;
+  const site = document.getElementById('planSite').value;
+  const devices = document.getElementById('planDevices').value.trim();
+  const notes = document.getElementById('planNotes').value.trim();
+  if(!date || !site || !devices) return alert('Fill Date, Site and Devices');
+  planning.push({ id: uid(), date, site, devices, notes });
+  document.getElementById('planDate').value=''; document.getElementById('planDevices').value=''; document.getElementById('planNotes').value='';
+  saveAll();
+});
+function deletePlanning(id){
+  if(!confirm('Delete planning item?')) return;
+  planning = planning.filter(x=>x.id!==id);
+  saveAll();
+}
+
+/* ========= Rendering ========= */
+function renderAll(){
+  // Dashboard totals
+  const totalInQty = records.filter(r=>r.type==='IN').reduce((s,r)=>s+(Number(r.qty)||0),0) + stockIn.reduce((s,i)=>s+(Number(i.qty)||0),0);
+  // But to avoid double counting, we will compute total IN as sum of stockIn qty + sum of IN records (older) — it's okay.
+  const totalOutQty = records.filter(r=>r.type==='OUT').reduce((s,r)=>s+(Number(r.qty)||0),0);
+  const totalInventoryQty = inventory.reduce((s,i)=>s+(Number(i.qty)||0),0);
+  statIn.textContent = totalInQty;
+  statOut.textContent = totalOutQty;
+  statInventory.textContent = totalInventoryQty;
+  statPlanned.textContent = planning.length || 0;
+
+  updateTopStats();
+
+  // StockIn table
+  stockInTable.innerHTML = stockIn.length ? stockIn.map(i=>`
+    <tr>
+      <td>${esc(i.device)}</td>
+      <td>${esc(i.serial)}</td>
+      <td>${esc(i.qty)}</td>
+      <td>${esc(i.date)}</td>
+      <td>
+        <button class="btn" onclick="openIssueModal(${i.id})">Issue</button>
+        <button class="btn secondary" onclick="(function(){ editingStockInId=${i.id}; document.getElementById('inDevice').value='${esc(i.device)}'; document.getElementById('inSerial').value='${esc(i.serial)}'; document.getElementById('inQty').value='${esc(i.qty)}'; document.getElementById('inDate').value='${esc(i.date)}'; document.getElementById('saveInBtn').textContent='Update';})()">Edit</button>
+        <button class="btn danger" onclick="(function(){ if(confirm('Delete this stock in item?')){ stockIn = stockIn.filter(x=>x.id!==${i.id}); saveAll(); }})()">Delete</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="5" class="muted">No in-stock items</td></tr>';
+
+  // StockOut table (pending)
+  stockOutTable.innerHTML = stockOut.length ? stockOut.map(i=>`
+    <tr>
+      <td>${esc(i.device)}</td>
+      <td>${esc(i.serial)}</td>
+      <td>${esc(i.qty)}</td>
+      <td>${esc(i.dateIssued||i.date||'')}</td>
+      <td>${esc(i.issuedTo||'')}</td>
+      <td>${esc(i.site||'')}</td>
+      <td>
+        <button class="btn" onclick="doneOut(${i.id})">DONE</button>
+        <button class="btn secondary" onclick="(function(){ editingStockInId=${i.id}; document.getElementById('inDevice').value='${esc(i.device)}'; document.getElementById('inSerial').value='${esc(i.serial)}'; document.getElementById('inQty').value='${esc(i.qty)}'; document.getElementById('inDate').value='${esc(i.date||i.dateIssued||'')}'; document.getElementById('saveInBtn').textContent='Update';})()">Edit</button>
+        <button class="btn danger" onclick="(function(){ if(confirm('Remove issued (pending) item?')){ stockOut = stockOut.filter(x=>x.id!==${i.id}); saveAll(); }})()">Delete</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="7" class="muted">No issued (pending) items</td></tr>';
+
+  // Inventory table
+  inventoryTable.innerHTML = inventory.length ? inventory.map(it=>`
+    <tr>
+      <td>${esc(it.device)}</td>
+      <td>${esc(it.serial)}</td>
+      <td>${esc(it.qty)}</td>
+      <td>${esc(it.date||'')}</td>
+      <td>
+        <button class="btn" onclick="editInventory(${it.id})">Edit</button>
+        <button class="btn danger" onclick="deleteInventory(${it.id})">Delete</button>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="5" class="muted">No inventory items</td></tr>';
+
+  // Records table (history) — filtered by search/site (globalSearch + recordsSearch both applied)
+  const globalQ = (document.getElementById('globalSearch').value || '').trim().toLowerCase();
+  const globalSite = (document.getElementById('globalSiteFilter').value || '').trim();
+  const recQ = (document.getElementById('recordsSearch').value || '').trim().toLowerCase();
+  const recSite = (document.getElementById('recordsSiteFilter').value || '').trim();
+  // combine filters: record is visible if matches both global and record search & site filters
+  const filteredRecords = records.filter(r=>{
+    if(globalSite && String(r.site||'').trim() !== globalSite) return false;
+    if(recSite && String(r.site||'').trim() !== recSite) return false;
+    const q = (globalQ + ' ' + recQ).trim();
+    if(!q) return true;
+    const hay = `${r.type} ${r.device} ${r.serial} ${r.issuedTo||''} ${r.site||''}`.toLowerCase();
+    return hay.includes(q);
+  });
+
+  recordsTable.innerHTML = filteredRecords.length ? filteredRecords.map(r=>`
+    <tr>
+      <td>${esc(r.type)}</td>
+      <td>${esc(r.device)}</td>
+      <td>${esc(r.serial)}</td>
+      <td>${esc(r.qty)}</td>
+      <td>${esc(r.site||'')}</td>
+      <td>${esc(r.issuedTo||'')}</td>
+      <td>${esc(r.date||'')}</td>
+      <td>
+        <button class="btn secondary" onclick="editRecord(${r.id})">Edit</button>
+        <button class="btn danger" onclick="deleteRecord(${r.id})">Delete</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="8" class="muted">No records</td></tr>';
+
+  // Planning table
+  planningTable.innerHTML = planning.length ? planning.map(p=>`
+    <tr><td>${esc(p.date)}</td><td>${esc(p.site)}</td><td>${esc(p.devices)}</td><td>${esc(p.notes)}</td>
+    <td><button class="btn danger" onclick="(function(){ if(confirm('Delete planning?')){ planning = planning.filter(x=>x.id!==${p.id}); saveAll(); }})()">Delete</button></td></tr>
+  `).join('') : '<tr><td colspan="5" class="muted">No planning items</td></tr>';
+}
+
+/* ========= Top stats ========= */
+function updateTopStats(){
+  const issuedCount = {};
+  records.filter(r=>r.type==='OUT').forEach(r=>{ if(r.device) issuedCount[r.device] = (issuedCount[r.device]||0)+1; });
+  const most = Object.keys(issuedCount).sort((a,b)=>issuedCount[b]-issuedCount[a])[0] || '—';
+  mostIssuedEl.textContent = most;
+
+  const siteCount = {};
+  records.filter(r=>r.type==='OUT').forEach(r=>{ if(r.site) siteCount[r.site] = (siteCount[r.site]||0)+1; });
+  const top = Object.keys(siteCount).sort((a,b)=>siteCount[b]-siteCount[a])[0] || '—';
+  topSiteEl.textContent = top;
+}
+
+/* ========= Exports ========= */
+function exportRecordsCSV(){
+  const rows = [['type','device','serial','qty','site','issuedTo','date']].concat(records.map(r=>[r.type,r.device,r.serial,r.qty,r.site||'',r.issuedTo||'',r.date||'']));
+  const csv = rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='records.csv'; a.click();
+}
+function exportPlanningCSV(){
+  const rows = [['date','site','devices','notes']].concat(planning.map(p=>[p.date,p.site,p.devices,p.notes]));
+  const csv = rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='planning.csv'; a.click();
+}
+
+/* ========= Helpers used in markup (global) ========= */
+window.openIssueModal = openIssueModal;
+window.doneOut = doneOut;
+window.editInventory = editInventory;
+window.deleteInventory = deleteInventory;
+window.editRecord = editRecord;
+window.deleteRecord = deleteRecord;
+
+/* ========= Initial render and event hooks ========= */
+document.getElementById('globalSearch').addEventListener('input', renderAll);
+document.getElementById('globalSiteFilter').addEventListener('change', renderAll);
+document.getElementById('recordsSearch').addEventListener('input', renderAll);
+document.getElementById('recordsSiteFilter').addEventListener('change', renderAll);
+
+renderAll();
+
+</script>
+</body>
+</html>
